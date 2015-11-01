@@ -1,0 +1,37 @@
+** Assignment 4
+
+Download Reactome interaction files in PSI-MITAB format from 
+http://www.reactome.org/download with the link: Human protein-protein
+interaction pairs in PSI-MITAB format. 
+
+Extract interactions into pair-wise gene symbols: one interaction per
+line (e.g. NFS1\tITGA7). 
+
+Map the TCGA PanCancer genes, which were provided in Week 2, to create a sub-network. Calculate four 
+centralities defined as in Table 7.1 in the Newman book for each gene 
+in the sub-network.
+
+Please program in your preferred language, and use any third-party 
+packages (e.g. matrix and/or network packages) you think are 
+necessary.
+
+Notes: This Reactome interaction network is different from the 
+Reactome FI network. You should find gene symbols in the file. 
+The calculation of centralities should be applied to the sub-network.
+
+Please submit your code, sub-network for 127 genes, and calculated 
+centralities. 
+
+** Assignment 5
+
+Implement breadth first search (BFS) algorithm and apply it to the 
+sub-network for 127 cancer genes you have generated last week: 
+
+1). Find how many components; 
+2). Calculate pair-wise distances; 
+3). Calculate average shortest path and the diameter of the sub-network.
+
+Submit your code and the running results.
+
+This assignment will be submitted in two weeks so you have time working 
+on your project proposal.

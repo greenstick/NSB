@@ -1,0 +1,51 @@
+{
+    "version": 1.2,
+    "author": "Benjamin Cordier",
+    "description": "Configuration JSON file for Assignments Framework",
+    "documentation": "",
+    "startupNotification": "Assignment Framework Version 1.2",
+    "outputDirectory": "output/",
+    "assignments": [
+        {
+            "assignment": "assignment-4",
+            "name": "Assignment 4",
+            "version": 0.1,
+            "source": "assignments/assignment4/assignment4.py",
+            "input": [
+                {
+                    "name": "full-network-file",
+                    "directory": "assignments/assignment4/data/",
+                    "file": "homo_sapiens.mitab.interactions.txt",
+                    "regexp": "dW5pcHJvdGtiOlthLXpBLVowLTlcLV17Myw4fQk="
+                },
+                {
+                    "name": "sub-network-file",
+                    "directory": "assignments/assignment4/data/",
+                    "file": "genes.txt",
+                    "regex": ""
+                }
+            ],
+            "output": {
+                "directory": "assignments/assignment4/output",
+                "format": {
+                    "json": true,
+                    "csv": false,
+                    "pipe": false
+                }
+            },
+            "settings": [],
+            "dependencies": [
+                {
+                    "name": "networkx",
+                    "version": "1.10 - stable",
+                    "install": "pip install networkx"
+                },
+                {
+                    "name": "matplotlib",
+                    "version": "1.4.3",
+                    "install": "pip install matplotlib"
+                }
+            ]
+        }
+    ]
+}
