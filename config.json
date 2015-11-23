@@ -9,7 +9,7 @@
         {
             "assignment": "assignment-4",
             "name": "Assignment 4",
-            "version": 0.1,
+            "version": 0.2,
             "source": "assignments/assignment4/assignment4.py",
             "input": [
                 {
@@ -27,6 +27,88 @@
             ],
             "output": {
                 "directory": "assignments/assignment4/output",
+                "format": {
+                    "json": true,
+                    "csv": false,
+                    "pipe": false
+                }
+            },
+            "settings": [],
+            "dependencies": [
+                {
+                    "name": "networkx",
+                    "version": "1.10 - stable",
+                    "install": "pip install networkx"
+                },
+                {
+                    "name": "matplotlib",
+                    "version": "1.4.3",
+                    "install": "pip install matplotlib"
+                }
+            ]
+        },
+        {
+            "assignment": "assignment-5",
+            "name": "Assignment 5",
+            "version": 0.2,
+            "source": "assignments/assignment5/assignment5.py",
+            "input": [
+                {
+                    "name": "full-network-file",
+                    "directory": "assignments/assignment5/data/",
+                    "file": "homo_sapiens.mitab.interactions.txt",
+                    "regexp": "dW5pcHJvdGtiOlthLXpBLVowLTlcLV17Myw4fQk="
+                },
+                {
+                    "name": "sub-network-file",
+                    "directory": "assignments/assignment5/data/",
+                    "file": "genes.txt",
+                    "regex": ""
+                }
+            ],
+            "output": {
+                "directory": "assignments/assignment5/output",
+                "format": {
+                    "json": true,
+                    "csv": false,
+                    "pipe": false
+                }
+            },
+            "settings": [],
+            "dependencies": [
+                {
+                    "name": "networkx",
+                    "version": "1.10 - stable",
+                    "install": "pip install networkx"
+                },
+                {
+                    "name": "matplotlib",
+                    "version": "1.4.3",
+                    "install": "pip install matplotlib"
+                }
+            ]
+        },
+        {
+            "assignment": "assignment-6",
+            "name": "Assignment 6",
+            "version": 0.1,
+            "source": "assignments/assignment6/assignment6.py",
+            "input": [
+                {
+                    "name": "full-network-file",
+                    "directory": "assignments/assignment6/data/",
+                    "file": "homo_sapiens.mitab.interactions.txt",
+                    "regexp": "dW5pcHJvdGtiOlthLXpBLVowLTlcLV17Myw4fQk="
+                },
+                {
+                    "name": "sub-network-file",
+                    "directory": "assignments/assignment6/data/",
+                    "file": "genes.txt",
+                    "regex": ""
+                }
+            ],
+            "output": {
+                "directory": "assignments/assignment6/output",
                 "format": {
                     "json": true,
                     "csv": false,

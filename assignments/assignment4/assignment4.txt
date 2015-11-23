@@ -21,17 +21,3 @@ The calculation of centralities should be applied to the sub-network.
 
 Please submit your code, sub-network for 127 genes, and calculated 
 centralities. 
-
-** Assignment 5
-
-Implement breadth first search (BFS) algorithm and apply it to the 
-sub-network for 127 cancer genes you have generated last week: 
-
-1). Find how many components; 
-2). Calculate pair-wise distances; 
-3). Calculate average shortest path and the diameter of the sub-network.
-
-Submit your code and the running results.
-
-This assignment will be submitted in two weeks so you have time working 
-on your project proposal.

@@ -1,0 +1,17 @@
+microRNA from virus
+Host protein
+motif detection using existing algorithms 
+Are microRNAs from virus interacting with human proteins
+
+find human virus and look for specific microRNA that can interact with human proteins
+
+Can make strict microRNA to protein directed
+
+Influenza h1n1
+
+protein to protein interaction network
+overlay microRNA targets 
+starting from microRNA root node, navigate from through protein protein interaction network
+How does microRNA modify expression
+Will not produce new transcripts
+Will bind to micro RNA proteins and modify expression

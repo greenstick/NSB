@@ -1,0 +1,2 @@
+- Try to develop a random permutation method to check whether or not the average shortest path obtained from last week's assignment is significant. 
+- Submit your code and analysis results.

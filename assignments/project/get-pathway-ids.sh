@@ -1,0 +1,1 @@
+curl 'http://www.reactome.org/download/current/ReactomePathways.txt' | grep -i "influenza" | grep -oEi "^(R-HSA-[0-9]+)" > influenza_reactome-pathway-ids.txt

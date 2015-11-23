@@ -127,11 +127,19 @@ if __name__ == "__main__":
 	exitCode 						= 0
 	try:
 	# Set Meta Data
-		version 						= 0.2
-		fullNetDataPath 				= "data/homo_sapiens.mitab.interactions.txt"
-		subNetDataPath 					= "data/genes.txt"
-		outputDirectory  				= "output"
-		settings 						= []
+		if len(Sys.argv) > 1:
+			config 							= JSON.loads(Sys.argv[1])
+			version 						= config["version"]
+			fullNetDataPath 				= config["input"][0]["directory"] + config["input"][0]["file"]
+			subNetDataPath 					= config["input"][1]["directory"] + config["input"][1]["file"]
+			outputDirectory 				= config["output"]["directory"]
+			settings 						= config["settings"]
+		else:
+			version 						= 0.2
+			fullNetDataPath 				= "data/homo_sapiens.mitab.interactions.txt"
+			subNetDataPath 					= "data/genes.txt"
+			outputDirectory  				= "output"
+			settings 						= []
 	except OSError as error:
 		print error
 		print "Error: unable to configure assignment4.py; try validating the config.json file online at JSONlint\n"
