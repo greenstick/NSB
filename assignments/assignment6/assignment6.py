@@ -260,7 +260,6 @@ def cleanSimpleEdges (edges):
 		if len(edge) == 2:
 			for node in edge:
 				if node == None or node == "-" or node == "":
-					print edge
 					continue
 				else:
 					clean.add(edge)
@@ -311,12 +310,7 @@ def convertGraphToEdgelist (graph):
 	@params:
 		edgeList 	- Required 	: (Set, List)
 	"""
-	edges, nodes = set(), graph.keys()
-	for node in nodes:
-		for link in graph[node]:
-			edges.add((node, link))
-	return list(edges)
-
+	return list(set((node, link) for link in list(node for node in graph.keys())))
 # 
 # Network Generators
 # 
@@ -353,14 +347,8 @@ def generateRandomComponents (populationGraph, count = 10, nodes = 100):
 	"""
 	sampleNodes = populationGraph.keys()
 	for i in range(0, count):
-		graph 	= {}
-		sample = Random.sample(sampleNodes, nodes)
-		for node in sample:
-			matches = []
-			for n in populationGraph[node]:
-				if n in sample:
-					matches.append(n)
-			graph[node] = matches
+		sample 	= Random.sample(sampleNodes, nodes)
+		graph 	= {node: [n for n in populationGraph[node] if n in sample] for node in sample}
 		yield graph
 
 def generateIntersectionSubgraph (edgeList, nodes):

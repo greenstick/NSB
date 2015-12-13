@@ -75,7 +75,7 @@ def readColsFromXSV(path, colStart = 0, colStop = 0, colStep = 1, keepHeader = T
 	with open(path, openAs) as xsv:
 		reader = CSV.reader(xsv, delimiter = delimiter)
 		if keepHeader == False:
-			reader.next()
+			next(reader)
 		for row in reader:
 			cols = row[colStart:colStop:colStep]
 			if len(cols) > 0:
@@ -123,7 +123,7 @@ def writeJSON (data, path="output/output.json", openAs = "w", indent = 4, separa
 # 
 
 if __name__ == "__main__":
-	print "\nStatus: assignment4.py initialized from commandline\n"
+	print("\nStatus: assignment4.py initialized from commandline\n")
 	exitCode 						= 0
 	try:
 	# Set Meta Data
@@ -141,20 +141,21 @@ if __name__ == "__main__":
 			outputDirectory  				= "output"
 			settings 						= []
 	except OSError as error:
-		print error
-		print "Error: unable to configure assignment4.py; try validating the config.json file online at JSONlint\n"
+		print(error)
+		print("Error: unable to configure assignment4.py; try validating the config.json file online at JSONlint\n")
 		Sys.exit(exitCode)
 	try:
 	# Core Logic 
-		print "Status: executing main routine"
-		print "\tStatus: importing data"
+		print("\nStatus: executing Assignment 4 routine\n")
+		print("\tStatus: importing data")
 		# Import Data
-		netDataFul	 					= readColsFromXSV(fullNetDataPath, colStart = 2, colStop = 4, keepHeader = False, delimiter = "\t")
-		netDataSub						= readColsFromXSV(subNetDataPath, colStart = 0, colStop = 1, keepHeader = False, delimiter = ",", openAs = "U")
-		netDataMatch 					= set()
-		genDataMatch 					= set()
-		synEdgeData 					= set()
-		synVerticeData 					= set()
+		interactionDataFull	 			= readColsFromXSV(fullNetDataPath, colStart = 2, colStop = 4, keepHeader = False, delimiter = "\t")
+		geneDataFull					= set()
+		for gene in readColsFromXSV(subNetDataPath, colStart = 0, colStop = 1, keepHeader = False, delimiter = ",", openAs = "U"):
+			geneDataFull.add(gene[0])
+		allInteractionPairs 			= set()
+		matchedInteractions 			= set()
+		matchedGenes 					= set()
 		edgeData 						= set()
 		verticeData 					= set()
 		connectedEdgeData 				= set()
@@ -165,100 +166,73 @@ if __name__ == "__main__":
 	# 
 
 		# Get Sub Network With At Least One Interaction Gene in TCGA Gene List
-		print "\tStatus: mapping subnetwork"
-		for row in netDataFul:
+		print("\tStatus: mapping subnetwork")
+		for row in interactionDataFull:
 			# Convert Row to String (join), Extract Genes Using Rgx Substitution & String Replace, Split Resulting String Into a List, Coerce into a Tuple
 			rowTuple 						= tuple(Rgx.sub(r"uniprotkb\:[a-zA-Z0-9]{1,8}\_", "", "".join(row)).replace("(shortlabel)", "_").split("_")[0:2])
-			for gene in netDataSub:
+			allInteractionPairs.add(rowTuple)
+			# allEdges.add(rowTuple)
+			# for node in rowTuple
+			for gene in geneDataFull:
 				# Remove Interactions Not Involved With At Least 1 Gene
-				if gene[0] in rowTuple:
-					netDataMatch.add(rowTuple)
-					genDataMatch.add(gene[0])
-		print "\n\t\tNotification: Simple Graph With at Least One Interaction Gene in TCGA Gene List Contains"
-		print "\t\t\tEdges:", len(netDataMatch)
-		print "\t\t\tVertices:", len(genDataMatch)
-		# netDataMatch Now has 7462 Interactions
-		# genDataMatch Now has 87 Genes
+				if gene in rowTuple:
+					matchedInteractions.add(rowTuple)
+					matchedGenes.add(gene)
+		print("\n\t\tNotification: Simple Graph With at Least One Interaction Gene in TCGA Gene List Contains")
+		print("\t\t\tEdges:", len(matchedInteractions))
+		print("\t\t\tVertices:", len(matchedGenes))
+		# matchedInteractions Now has 7462 Interactions
+		# matchedGenes Now has 87 Genes
 
-		# Get Sub Network With Both Interaction Genes in TCGA Gene List
-		for geneA, geneB in netDataMatch:
-			# Remove Self Edges
-			if geneA == geneB:
-				continue
-			existsGeneA, existsGeneB = False, False
-			for gene in genDataMatch:
-				if geneA == gene:
-					existsGeneA = True
-				if geneB == gene:
-					existsGeneB = True
-				if existsGeneA == True and existsGeneB == True:
-					synEdgeData.add((geneA, geneB))
-					synVerticeData.add(gene)
-		print "\t\tNotification: Simple Graph With Both Interaction Genes in TCGA Gene List Contains"
-		print "\t\t\tEdges:", len(synEdgeData)
-		print "\t\t\tVertices:", len(synVerticeData)
-		# synEdgeData Now Has 186 Interactions
-		# synVerticeData Now Has 85 Genes
-
-		print "\t\tNotification: Simple Graph With No Synonymous Interactions or Self Loops Contains"
-		# Remove Synonymous Interactions
-		for genesA in synEdgeData:
-			geneSetA = set(genesA)
-			for genesB in synEdgeData:
-				geneSetB = set(genesB)
-				intersection = set(geneSetA | geneSetB)
-				# If Interactions Are Synonymous, the Set Intersection Will Collapse to a Maximum of l = 2
-				if len(intersection) > 2:
-					edgeData.add(genesA)
-		print "\t\t\tEdges:", len(edgeData)
+		print("\t\tNotification: Simple Graph With No Synonymous Interactions or Self Loops Contains")
+		edgeData, verticeData = generateIntersectionSubgraph(matchedInteractions, matchedGenes)
+		print("\t\t\tEdges:", len(edgeData))
+		print("\t\t\tVertices:", len(verticeData))
 		# edgeData Now Has 186 Interactions
-
-		# Get Unique Vertices From Interactions
-		for geneA, geneB in edgeData:
-			verticeData.add(geneA)
-			verticeData.add(geneB)
-		print "\t\t\tVertices:", len(verticeData)
 		# verticeData Now Has 69 Genes
-
-		print "\n\tStatus: generating clean network graph, computing metrics, and saving files\n"
-		edgeData = list(edgeData)
-		verticeData = list(verticeData)
 
 	# 
 	# Generating NetworkX Graph & Computing Basic Metrics
 	# 
 
+		print("\n\tStatus: generating network graph of largest component & computing metrics\n")
+		edgeData = list(edgeData)
+		verticeData = list(verticeData)
 		# Generate NetworkX Graph Object
-		graph = NX.Graph()
+		graph 		= NX.Graph()
 		# Adding Vertices Is Probably Redundant...
-		graph.add_nodes_from(verticeData)
 		graph.add_edges_from(edgeData)
 
-		# Getting The Largest Component
-		graph = max(NX.connected_component_subgraphs(graph), key=len)
+		# Saving old Graph for downstream component analysis
+		oldGraph 	= graph
+		oldNodes 	= oldGraph.nodes()
+		oldEdges 	= oldGraph.edges()
+		graph 		= max(NX.connected_component_subgraphs(graph), key=len)
+		nodeCount 	= graph.number_of_nodes()
+		edgeCount 	= graph.number_of_edges()
 
-		print "\t\tNotification: Largest Connected Graph Component"
-		print "\t\t\tEdges:", graph.number_of_edges()
-		print "\t\t\tVertices:", graph.number_of_nodes()
+		print("\t\tNotification: Largest Connected Component")
+		print("\t\t\tEdges:", edgeCount)
+		print("\t\t\tVertices:", nodeCount)
 		# The Graphs Largest Component Has 163 Interactions
 		# The Graphs Largest Component Has 67 Genes
-		print "\t\t\tProportion of TCGA Genes =", round(float(graph.number_of_nodes()) / len(netDataSub), 8)
+		print("\t\t\tProportion of TCGA Genes =", round(float(nodeCount) / len(geneDataFull), 8))
 
 		# Save Sub Network in Edges File & Vertices File
-		NX.write_edgelist(graph, outputDirectory + "/sub-network-edges.txt", data = False)
-		writeOutput(NX.nodes(graph), outputDirectory + "/sub-network-vertices.txt")
+		# NX.write_edgelist(graph, outputDirectory + "/sub-network-edges.txt", data = False)
+		# writeOutput(NX.nodes(graph), outputDirectory + "/sub-network-vertices.txt")
 
 		# Plot Network & Save
-		print "\n\tStatus: rendering network graph"
-		NX.draw_spring(graph, with_labels = True, font_size = 4, vertice_size=400, iterations = 1000, alpha = 0.2)
-		Plot.savefig(outputDirectory + "/subnetwork-graph.svg")
+		print("\n\tStatus: rendering network graph")
+		# NX.draw_spring(graph, with_labels = True, font_size = 4, vertice_size=400, iterations = 1000, alpha = 0.2)
+		# Plot.savefig(outputDirectory + "/subnetwork-graph.svg")
 
 	# 
 	# Computing Centralities
 	# 
 
 		# Compute Degree Centrality & Write Output to JSON
-		print "\tStatus: computing degree centralities"
+		print("\tStatus: computing degree centralities")
 		degreeCentrality = NX.degree_centrality(graph)
 		degreeCentralityDicts = []
 		for key, value in degreeCentrality.items():
@@ -266,15 +240,14 @@ if __name__ == "__main__":
 			dict["gene"] 					= key
 			dict["degreeCentrality"] 		= value
 			degreeCentralityDicts.append(dict)
-		writeDictsToCSV(degreeCentralityDicts, path = outputDirectory + "/sub-network-degree-centrality.txt")
-		writeJSON(degreeCentralityDicts, path = outputDirectory + "/sub-network-degree-centrality.json")
+		# writeDictsToCSV(degreeCentralityDicts, path = outputDirectory + "/sub-network-degree-centrality.txt")
+		# writeJSON(degreeCentralityDicts, path = outputDirectory + "/sub-network-degree-centrality.json")
 		# Compute Max & Min Degree Centralities
-		degreeCentralityValues 	= [dict["degreeCentrality"] for dict in degreeCentralityDicts]
-		maxDegreeCentrality 	= max(degreeCentralityValues)
-		minDegreeCentrality 	= min(degreeCentralityValues)
+		maxDegreeCentrality 	= max(degreeCentralityDicts, key = lambda d: d["degreeCentrality"])
+		minDegreeCentrality 	= min(degreeCentralityDicts, key = lambda d: d["degreeCentrality"])
 
 		# Compute Page Rank & Write Output to JSON
-		print "\tStatus: computing pagerank"
+		print("\tStatus: computing pagerank")
 		pageRank = NX.pagerank(graph)
 		pageRankDicts = []
 		for key, value in pageRank.items():
@@ -282,15 +255,14 @@ if __name__ == "__main__":
 			dict["gene"] 					= key
 			dict["pageRank"] 				= value
 			pageRankDicts.append(dict)
-		writeDictsToCSV(pageRankDicts, path = outputDirectory + "/sub-network-page-rank.txt")
-		writeJSON(pageRankDicts, path = outputDirectory + "/sub-network-page-rank.json")
+		# writeDictsToCSV(pageRankDicts, path = outputDirectory + "/sub-network-page-rank.txt")
+		# writeJSON(pageRankDicts, path = outputDirectory + "/sub-network-page-rank.json")
 		# Compute Max & Min Page Ranks
-		pagerankValues 			= [dict["pageRank"] for dict in pageRankDicts]
-		maxPagerank 			= max(pagerankValues)
-		minPagerank 			= min(pagerankValues)
+		maxPagerank 			= max(pageRankDicts, key = lambda d: d["pageRank"])
+		minPagerank 			= min(pageRankDicts, key = lambda d: d["pageRank"])
 
 		# Compute Eigenvector Centrality & Write Output to JSON
-		print "\tStatus: computing eigenvector centralities"
+		print("\tStatus: computing eigenvector centralities")
 		eigenvectorCentrality = NX.eigenvector_centrality(graph)
 		eigenvectorCentralityDicts = []
 		for key, value in eigenvectorCentrality.items():
@@ -298,12 +270,11 @@ if __name__ == "__main__":
 			dict["gene"] 					= key
 			dict["eigenvectorCentrality"] 	= value
 			eigenvectorCentralityDicts.append(dict)
-		writeDictsToCSV(eigenvectorCentralityDicts, path = outputDirectory + "/sub-network-eigenvector-centrality.txt")
-		writeJSON(eigenvectorCentralityDicts, path = outputDirectory + "/sub-network-eigenvector-centrality.json")
+		# writeDictsToCSV(eigenvectorCentralityDicts, path = outputDirectory + "/sub-network-eigenvector-centrality.txt")
+		# writeJSON(eigenvectorCentralityDicts, path = outputDirectory + "/sub-network-eigenvector-centrality.json")
 		# Compute Max & Min Eigenvector Centralities
-		eigenvectorValues 		= [dict["eigenvectorCentrality"] for dict in eigenvectorCentralityDicts]
-		maxEigenvector 			= max(eigenvectorValues)
-		minEigenvector 			= min(eigenvectorValues)
+		maxEigenvectorCentrality= max(eigenvectorCentralityDicts, key = lambda d: d["eigenvectorCentrality"])
+		minEigenvectorCentrality= min(eigenvectorCentralityDicts, key = lambda d: d["eigenvectorCentrality"])
 
 		# Get Adjacency Matrix & Compute Eigenvalues for Katz Centrality alpha Parameter
 		lMatrix  				= NX.adjacency_matrix(graph)
@@ -315,7 +286,7 @@ if __name__ == "__main__":
 		katzAlpha 				= maxEigenvalueInverse - 0.0001
 
 		# Compute Katz Centrality & Write Output to JSON
-		print "\tStatus: computing katz centralities"
+		print("\tStatus: computing katz centralities")
 		katzCentrality = NX.katz_centrality_numpy(graph, alpha = katzAlpha)
 		katzCentralityDicts = []
 		for key, value in katzCentrality.items():
@@ -323,32 +294,30 @@ if __name__ == "__main__":
 			dict["gene"] 					= key
 			dict["katzCentrality"] 			= value
 			katzCentralityDicts.append(dict)
-		writeDictsToCSV(katzCentralityDicts, path = outputDirectory + "/sub-network-katz-centrality.txt")
-		writeJSON(katzCentralityDicts, path = outputDirectory + "/sub-network-katz-centrality.json")
+		# writeDictsToCSV(katzCentralityDicts, path = outputDirectory + "/sub-network-katz-centrality.txt")
+		# writeJSON(katzCentralityDicts, path = outputDirectory + "/sub-network-katz-centrality.json")
 		# Compute Max & Min Katz Centralities
-		katzCentralityValues 		= [dict["katzCentrality"] for dict in katzCentralityDicts]
-		maxKatzCentrality 			= max(katzCentralityValues)
-		minKatzCentrality 			= min(katzCentralityValues)
-
-		print "\n\t\tNotification: computed Metrics:"
-		print "\t\t\tMax Degree Centrality \t\t=", round(maxDegreeCentrality, 8)
-		print "\t\t\tMin Degree Centrality \t\t=", round(minDegreeCentrality, 8)
-		print "\t\t\tMax Pagerank \t\t\t=", round(maxPagerank, 8)
-		print "\t\t\tMin Pagerank \t\t\t=", round(minPagerank, 8)
-		print "\t\t\tMax Eigenvector \t\t=", round(maxEigenvector, 8)
-		print "\t\t\tMin Eigenvector \t\t=", round(minEigenvector, 8)
-		print "\t\t\tMax Katz Centrality \t\t=", round(maxKatzCentrality, 8)
-		print "\t\t\tMin Katz Centrality \t\t=", round(minKatzCentrality, 8)
-		print "\n\t\t\tMax Eigenvalue* \t\t=", round(maxEigenvalue, 8)
-		print "\t\t\tInverse of Max Eigenvalue \t=", round(maxEigenvalueInverse, 8)
-		print "\t\t\tKatz Centrality alpha Computed Using: (1 / Max Eigenvalue) - 0.0001"
-		print "\t\t\tKatz Centrality alpha Parameter Used:", round(katzAlpha, 8)
-		print "\n\t\t\t*Max Eigenvalue computed is imaginary", maxEigenvalueImaginary, "only real portion used for computation."
-
-		print "\nStatus: done\n"
+		maxKatzCentrality 			= max(katzCentralityDicts, key = lambda d: d["katzCentrality"])
+		minKatzCentrality 			= min(katzCentralityDicts, key = lambda d: d["katzCentrality"])
+		# Output metrics
+		print("\n\t\tNotification: computed metrics...")
+		print("\t\t\tMax Degree Centrality \t\t=", 				round(maxDegreeCentrality["degreeCentrality"], 8)			, "\tGene:", maxDegreeCentrality["gene"])
+		print("\t\t\tMin Degree Centrality \t\t=", 				round(minDegreeCentrality["degreeCentrality"], 8)			, "\tGene:", minDegreeCentrality["gene"])
+		print("\t\t\tMax Pagerank \t\t\t=", 					round(maxPagerank["pageRank"], 8)							, "\tGene:", maxPagerank["gene"])
+		print("\t\t\tMin Pagerank \t\t\t=", 					round(minPagerank["pageRank"], 8)							, "\tGene:", minPagerank["gene"])
+		print("\t\t\tMax Eigenvector \t\t=", 					round(maxEigenvectorCentrality["eigenvectorCentrality"], 8)	, "\tGene:", maxEigenvectorCentrality["gene"])
+		print("\t\t\tMin Eigenvector \t\t=", 					round(minEigenvectorCentrality["eigenvectorCentrality"], 8)	, "\tGene:", minEigenvectorCentrality["gene"])
+		print("\t\t\tMax Katz Centrality \t\t=", 				round(maxKatzCentrality["katzCentrality"], 8)				, "\tGene:", maxKatzCentrality["gene"])
+		print("\t\t\tMin Katz Centrality \t\t=",				round(minKatzCentrality["katzCentrality"], 8)				, "\tGene:", minKatzCentrality["gene"])
+		print("\n\t\tNotification: Katz alpha parameter computations...")
+		print("\t\t\tMax Eigenvalue* \t\t=", 					round(maxEigenvalue, 8))
+		print("\t\t\tInverse of Max Eigenvalue \t=", 			round(maxEigenvalueInverse, 8))
+		print("\t\t\tKatz Centrality alpha Computed Using: (1 / Max Eigenvalue) - 0.0001")
+		print("\t\t\tKatz Centrality alpha Parameter Used:", 	round(katzAlpha, 8))
+		print("\n\t\t\t*Max Eigenvalue computed is imaginary type", maxEigenvalueImaginary, "only real portion used for computation.\n")
 	except OSError as error:
-		print error
-		print "Error: unable to run assignment4.py\n"
+		print(error)
+		print("Error: unable to run assignment4.py\n")
 		Sys.exit(exitCode)
 	exitCode = 1
 	Sys.exit(exitCode)
