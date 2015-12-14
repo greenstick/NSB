@@ -346,10 +346,30 @@ def generateRandomComponents (populationGraph, count = 10, nodes = 100):
 		nodes 				- Optional 	: (Int)
 	"""
 	sampleNodes = populationGraph.keys()
-	for i in range(0, count):
-		sample 	= Random.sample(sampleNodes, nodes)
-		graph 	= {node: [n for n in populationGraph[node] if n in sample] for node in sample}
-		yield graph
+	start 		= Random.sample(sampleNodes, 1)
+	components 	= []
+	for i in range(1, count):
+		component = []
+		while len(component) < nodes:
+			a, b = bfs(graph, start)
+			component.append((a, b))
+		components.append(component)
+
+def bfs (graph, start):
+	"""
+	Discover edges in a network using a Breadth-First Search
+	@params:
+		graph 		- Required 	: (Dictionary)
+		start 		- Optional 	: (Str, Int)
+	"""
+	queue, enqueued = deque([(None, start)]), set([start])
+	while queue:
+		parent, node = queue.popleft()
+		yield parent, node
+		if node in graph:
+			v = set(graph[node]) - enqueued
+			enqueued |= v
+			queue.extend([(node, child) for child in v])
 
 def generateIntersectionSubgraph (edgeList, nodes):
 	""" 
