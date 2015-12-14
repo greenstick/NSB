@@ -101,12 +101,14 @@ def readColsFromXSV(path, colStart = 0, colStop = 0, colStep = 1, keepHeader = T
 	return rowValues
 
 # Prompt user input from command line
-def getUserInput (valid, prompt, hint = "", failed =Error: Invalid input"):
+def getUserInput (valid, prompt, hint = "", failed = "Error: Invalid input"):
 	"""
 	Prompts user for and validates input using regular expression
 	@params:
-		prompt 		- Required 	: verbose user prompt (Str)
 		valid 		- Required 	: regex to validate against (Rgx)
+		prompt 		- Required 	: verbose user prompt (Str)
+		hint 		- Optional 	: input hint (Str)
+		failed 		- Optional 	: failed input (Str)
 	Returns: dicts (List)
 	"""
 	print(prompt)
@@ -118,7 +120,7 @@ def getUserInput (valid, prompt, hint = "", failed =Error: Invalid input"):
 		return response
 	else:
 		print(failed)
-		return getUserInput(valid, prompt, failed)
+		return getUserInput(valid, prompt, hint, failed)
 
 # Print iterations progress
 def printProgress (iteration, total, prefix = '', suffix = '', decimals = 2, barLength = 100):
@@ -278,9 +280,14 @@ if __name__ == "__main__":
 		randomComponentCount 			= 100
 		randomComponentSize 			= 100
 		interactionDataResponse 		= "0"
+		pValue 							= float(getUserInput(valid=r"([0]\.[0-9]{1,3}|exit)", prompt="\tPrompt: Set rank p-Value...", hint = "\t\tHint: enter a number between 0.001 and 0.999\n\t\tSelection: ", failed = "\t\tError: Invalid input"))
 		usePicklesResponse 				= getUserInput(valid=r"([yYnN]{1}|exit)", prompt="\tPrompt: Reproduce last run using pickled data?", hint = "\t\tHint: enter 'y', 'n', or 'exit' to exit\n\t\tSelection: ", failed = "\t\tError: Invalid input")
 		if usePicklesResponse.lower() == "y":
 			usePickles 					= True
+			interactionDataResponse 	= getUserInput(valid=r"([0-1]{1}|exit)", prompt="\tPrompt: Use Reactome PSI-MItab [0], FI network [1]?", hint = "\t\tHint: enter 0, 1, or 'exit' to exit\n\t\tSelection: ", failed = "\t\tError: Invalid input")
+			if interactionDataResponse == "exit":
+				exitCode 				= 1
+				Sys.exit(exitCode)
 			useRandomComponentsResponse 	= getUserInput(valid=r"([yYnN]{1}|exit)", prompt="\tPrompt: Generate bootstrap analysis (No indicates a big component analysis will be generated)?", hint = "\t\tHint: enter 'y', 'n', or 'exit' to exit\n\t\tSelection: ", failed = "\t\tError: Invalid input")
 			if useRandomComponentsResponse.lower() == "y":
 				useRandomComponents 		= True
@@ -313,8 +320,18 @@ if __name__ == "__main__":
 	# 
 	# Import Data
 	# 
-
-		print("\tStatus: Importing Data")
+		if usePickles == False:
+			print("\n\tStatus: Removing Data From Previous Run...")
+			if useRandomComponents == True:
+				list(map(OS.unlink, (OS.path.join( rcsbDirectory,f) for f in OS.listdir(rcsbDirectory))))
+				list(map(OS.unlink, (OS.path.join( rccbDirectory,f) for f in OS.listdir(rccbDirectory))))
+				list(map(OS.unlink, (OS.path.join( rccDirectory,f) for f in OS.listdir(rccDirectory))))
+			else:
+				list(map(OS.unlink, (OS.path.join( bcsbDirectory,f) for f in OS.listdir(bcsbDirectory))))
+				list(map(OS.unlink, (OS.path.join( bccbDirectory,f) for f in OS.listdir(bccbDirectory))))
+				list(map(OS.unlink, (OS.path.join( bccDirectory,f) for f in OS.listdir(bccDirectory))))
+				list(map(OS.unlink, (OS.path.join( bcmDirectory,f) for f in OS.listdir(bcmDirectory))))
+		print("\tStatus: Importing Data\n")
 		allInteractionPairs 			= []
 		if interactionDataResponse == "0":
 			# Import Interactions Node Data
@@ -327,7 +344,8 @@ if __name__ == "__main__":
 						if (interaction[0] != None and len(interaction[0]) > 1) and (interaction[1] != None and len(interaction[1]) > 1):
 							allInteractionPairs.append(interaction)
 		else:
-			for row in readColsFromXSV(fiDataPath, colStart = 0, colStop = 3, keepHeader = False, delimiter = "\t", progress = True):
+			interactionDataPath = fiDataPath
+			for row in readColsFromXSV(interactionDataPath, colStart = 0, colStop = 3, keepHeader = False, delimiter = "\t", progress = True):
 				interaction 					= (row[0], row[1])
 				# Remove self-edges, singletons, interactions with empty None values or a length less than or equal to one
 				if len(interaction) == 2:
@@ -352,7 +370,7 @@ if __name__ == "__main__":
 	# Structure Data & Perform Basic EDA
 	# 
 
-		print("\tStatus: Retrieving largest TCGA subgraph component")
+		print("\tStatus: Retrieving big component")
 		fullGraph 						= NX.Graph()
 		fullGraph.add_edges_from(interactionSubgraph)
 		bigComponent 					= max(NX.connected_component_subgraphs(fullGraph), key = len)
@@ -370,13 +388,24 @@ if __name__ == "__main__":
 			cliqueBeliefFiles 					= []
 			cliqueFiles 						= []
 			sepsetBeliefFiles 					= []
+			alltcgaGenes 						= set()
+			for gene in tcgaDataFull:
+				for edge in bigComponent.edges():
+					if gene in edge:
+						alltcgaGenes.add(gene)
+			allCosmicGenes 					= set()
+			for gene in oncoDataFull:
+				for edge in bigComponent.edges():
+					if gene in edge:
+						allCosmicGenes.add(gene)
 			if usePickles == True:
 				cliqueBeliefFiles 				= OS.listdir(OS.getcwd() + "/" + rccbDirectory)
 				cliqueFiles 					= OS.listdir(OS.getcwd() + "/" + rccDirectory)
 				sepsetBeliefFiles 				= OS.listdir(OS.getcwd() + "/" + rcsbDirectory)
 				if len(cliqueBeliefFiles) < 1 or len(cliqueFiles) < 1 or len(sepsetBeliefFiles) < 1:
 					usePickles = False
-					print("\tExcept: Unable to locate files from previouse random component generation. Proceeding with random component generation. ")
+					print("\tExcept: Unable to locate files from previous random component generation. Proceeding with random component generation. ")
+			print("\tStatus: Generating Random Components\n")
 			if usePickles == False:
 				randomComponents 				= []
 				nodeCounts 						= []
@@ -402,7 +431,7 @@ if __name__ == "__main__":
 					cosmicGeneCounts.append(len(cosmicGenes))
 					randomComponents.append(component)
 					i 							   += 1
-					printProgress(i, randomComponentCount, prefix = "\tGenerating Components:" , suffix = "Generated", decimals = 2, barLength = 50)
+					printProgress(i, randomComponentCount, prefix = "\t\tRandom Components:" , suffix = "Generated", decimals = 2, barLength = 50)
 				print("\n\n\t\tRandom Component Metrics - >")
 				print("\n\t\t\tMin Node Count:\t\t\t", min(nodeCounts))
 				print("\t\t\tMedian Node Count:\t\t", median(nodeCounts))
@@ -456,7 +485,7 @@ if __name__ == "__main__":
 						validModels.append(mrf)
 						validModelsCount 		   += 1
 				print("\tStatus: " + str(round(((float(validModelsCount) / randomComponentCount) * 100), 2)) + "%" + " of Models Pass Quality Check")
-				print("\tStatus: Generating & Saving Inferences From Valid Models")
+				print("\tStatus: Generating & Saving Inferences From Valid Models\n")
 				i = 0
 				for model in validModels:
 					try:
@@ -473,16 +502,152 @@ if __name__ == "__main__":
 							Pickle.dump(cliqueBeliefs, jar)
 						with open(rccDirectory + str(completedModels) + "_cliques.pickle", "wb") as jar:
 							Pickle.dump(cliques, jar)
-						printProgress(i, randomComponentCount, prefix = "\tComputing:" , suffix = "Success: (" + str(round(((float(completedModels) / i) * 100), 2)) + "%)" , decimals = 0, barLength = 50)
+						printProgress(i, randomComponentCount, prefix = "\t\tComputing:" , suffix = "Success: (" + str(round(((float(completedModels) / i) * 100), 2)) + "%)" , decimals = 2, barLength = 50)
 					except:
 						i 						   += 1
-						printProgress(i, randomComponentCount, prefix = "\tComputing:" , suffix = "Success: (" + str(round(((float(completedModels) / i) * 100), 2)) + "%)", decimals = 0, barLength = 50)
+						printProgress(i, randomComponentCount, prefix = "\t\tComputing:" , suffix = "Success: (" + str(round(((float(completedModels) / i) * 100), 2)) + "%)", decimals = 2, barLength = 50)
 						continue
 				cliqueBeliefFiles 						= OS.listdir(OS.getcwd() + "/" + rccbDirectory)
 				cliqueFiles 							= OS.listdir(OS.getcwd() + "/" + rccDirectory)
 				sepsetBeliefFiles 						= OS.listdir(OS.getcwd() + "/" + rcsbDirectory)
-			for filePath in cliqueBeliefFiles:
 
+		# 
+		# Computing highest scoring genes
+		# 
+			
+			print("\n\n\tStatus: Computing Gene Scores\n")
+			cbDict = {}
+			sbDict = {}
+			i = 0
+			for cliqueBeliefFile in cliqueBeliefFiles:
+				uniqueCBs = set()
+				with open(rccbDirectory + cliqueBeliefFile, "rb") as jar:
+					cb = Pickle.load(jar)
+					for v in cb:
+						uniqueCBs.add(frozenset(v))
+					for s in uniqueCBs:
+						for g in s:
+							if g in cbDict:
+								cbDict[g] += 1
+							else:
+								cbDict[g] = 1
+				i += 1
+				printProgress(i, len(cliqueBeliefFiles), prefix = "\t\tComputing Clique Belief Gene Scores:" , suffix = "of Analysis Complete", decimals = 2, barLength = 50)
+			i = 0
+			cbList = sorted(cbDict.items(), key = lambda x: x[1], reverse = True)
+			print("\n")
+			for sepsetBeliefFile in sepsetBeliefFiles:
+				uniqueSBs = set()
+				with open(rcsbDirectory + sepsetBeliefFile, "rb") as jar:
+					sb = Pickle.load(jar)
+					for s in sb:
+						for v in s:
+							uniqueSBs.add(frozenset(v))
+					for s in uniqueSBs:
+						for g in s:
+							if g in sbDict:
+								sbDict[g] += 1
+							else:
+								sbDict[g] = 1
+				i += 1
+				printProgress(i, len(sepsetBeliefFiles), prefix = "\t\tComputing Sepset Belief Gene Scores:" , suffix = "of Analysis Complete", decimals = 2, barLength = 50)
+			sbList = sorted(sbDict.items(), key = lambda x: x[1], reverse = True)
+			print("\n\n\t\tGenerating Analysis")
+			# Cross Reference CB Genes With Known
+			topCBcosmic = []
+			# Are CB Genes in Cosmic?
+			for gene in cbList:
+				status = False
+				for onco in allCosmicGenes:
+					if gene[0] == onco:
+						status = True
+						break
+				gene += (status, )
+				topCBcosmic.append(gene)
+			topCBAll = []
+			rank = 1
+			# Are CB Genes in TCGA?
+			for gene in topCBcosmic:
+				status = False
+				for onco in alltcgaGenes:
+					if gene[0] == onco:
+						status = True
+						break
+				gene += (status, )
+				gene += (rank, )
+				rank += 1
+				topCBAll.append(gene)
+			topCBCutoff = topCBAll[0: int(pValue * len(cbList))]
+			# Cross Reference SB Genes With Known
+			topSB = sbList[0: int(pValue * len(sbList))]
+			topSBcosmic = []
+			# Are SB Genes in Cosmic?
+			for gene in sbList:
+				status = False
+				for onco in allCosmicGenes:
+					if gene[0] == onco:
+						status = True
+						break
+				gene += (status, )
+				topSBcosmic.append(gene)
+			topSBAll = []
+			rank = 1
+			# Are SB Genes in TCGA?
+			for gene in topSBcosmic:
+				status = False
+				for onco in alltcgaGenes:
+					if gene[0] == onco:
+						status = True
+						break
+				gene += (status, )
+				gene += (rank, )
+				rank += 1
+				topSBAll.append(gene)
+			topSBCutoff = topSBAll[0: int(pValue * len(sbList))]
+
+			print("\n------------------------------------------------------------------------------------------")
+			print("-----------------------------------------ANALYSIS-----------------------------------------")
+			print("------------------------------------------------------------------------------------------")
+			print("\nTop Ranked Genes (Clique Belief)\n")
+			for gene in topCBCutoff:
+				print("Rank:", gene[4], "\tGene:", gene[0], "\tScore:", gene[1], "\tCOSMIC:", gene[2], "\tTCGA:", gene[3], "\tDegree:", NX.degree(bigComponent, gene[0]))
+			print("\nAnalysis Statistics:")
+			print("p-Value\t\t", "=", pValue)
+			print("n\t\t", "=", len(cbList))
+			print("------------------------------------------------------------------------------------------")
+			print("\nTop Ranked Genes (Sepset Belief)\n")
+			for gene in topSBCutoff:
+				print("Rank:", gene[4], "\tGene:", gene[0], "\tScore:", gene[1], "\tCOSMIC:", gene[2], "\tTCGA:", gene[3], "\tDegree:", NX.degree(bigComponent, gene[0]))
+			print("\nAnalysis Statistics:")
+			print("p-Value\t\t", "=", pValue)
+			print("n\t\t", "=", len(sbList))
+			print("------------------------------------------------------------------------------------------")
+			print("\nTop 25 Novel Candidate Genes (Sepset Belief)\n")
+			count = 0
+			for gene in topCBAll:
+				if count < 25:
+					if gene[3] is False:
+						print("Rank:", gene[4], "\tGene:", gene[0], "\tScore:", gene[1], "\tCOSMIC:", gene[2], "\tTCGA:", gene[3], "\tDegree:", NX.degree(bigComponent, gene[0]))
+						count += 1
+			print("------------------------------------------------------------------------------------------")
+			print("\nTop 25 Novel Candidate Genes (Sepset Belief)\n")
+			count = 0
+			for gene in topSBAll:
+				if count < 25:
+					if gene[3] is False:
+						print("Rank:", gene[4], "\tGene:", gene[0], "\tScore:", gene[1], "\tCOSMIC:", gene[2], "\tTCGA:", gene[3], "\tDegree:", NX.degree(bigComponent, gene[0]))
+						count += 1
+
+			print("\nAnalysis Statistics:")
+			print("p-Value\t\t", "=", pValue)
+			print("n\t\t", "=", len(sbList))
+			print("------------------------------------------------------------------------------------------")
+			print("\nNetwork (Big Component) Statistics")
+			print("Nodes\t\t:", bigComponent.number_of_nodes())
+			print("Edges\t\t:", bigComponent.number_of_edges())
+			print("Mean Degree\t:", float(bigComponent.number_of_edges()) / bigComponent.number_of_nodes())
+			print("Data Source\t:", interactionDataPath)
+			print("------------------------------------------------------------------------------------------")
 
 	# 
 	# Big Component Analysis
