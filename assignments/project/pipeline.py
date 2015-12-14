@@ -405,8 +405,8 @@ if __name__ == "__main__":
 				if len(cliqueBeliefFiles) < 1 or len(cliqueFiles) < 1 or len(sepsetBeliefFiles) < 1:
 					usePickles = False
 					print("\tExcept: Unable to locate files from previous random component generation. Proceeding with random component generation. ")
-			print("\tStatus: Generating Random Components\n")
 			if usePickles == False:
+				print("\tStatus: Generating Random Components\n")
 				randomComponents 				= []
 				nodeCounts 						= []
 				edgeCounts 						= []
@@ -552,7 +552,7 @@ if __name__ == "__main__":
 				i += 1
 				printProgress(i, len(sepsetBeliefFiles), prefix = "\t\tComputing Sepset Belief Gene Scores:" , suffix = "of Analysis Complete", decimals = 2, barLength = 50)
 			sbList = sorted(sbDict.items(), key = lambda x: x[1], reverse = True)
-			print("\n\n\t\tGenerating Analysis")
+			print("\n\n\tStatus: Generating Analysis")
 			# Cross Reference CB Genes With Known
 			topCBcosmic = []
 			# Are CB Genes in Cosmic?
@@ -603,51 +603,59 @@ if __name__ == "__main__":
 				gene += (rank, )
 				rank += 1
 				topSBAll.append(gene)
-			topSBCutoff = topSBAll[0: int(pValue * len(sbList))]
+			topSBCutoff 				= topSBAll[0: int(pValue * len(sbList))]
+			eigenvectorCentralities 	= NX.eigenvector_centrality(bigComponent)
+			bcMSP 						= NX.average_shortest_path_length(bigComponent)
+			bcDiameter 					= NX.diameter(bigComponent)
 
-			print("\n------------------------------------------------------------------------------------------")
-			print("-----------------------------------------ANALYSIS-----------------------------------------")
-			print("------------------------------------------------------------------------------------------")
+
+			print("\n------------------------------------------------------------------------------------------------------------------------")
+			print("--------------------------------------------------------ANALYSIS--------------------------------------------------------")
+			print("------------------------------------------------------------------------------------------------------------------------")
 			print("\nTop Ranked Genes (Clique Belief)\n")
 			for gene in topCBCutoff:
-				print("Rank:", gene[4], "\tGene:", gene[0], "\tScore:", gene[1], "\tCOSMIC:", gene[2], "\tTCGA:", gene[3], "\tDegree:", NX.degree(bigComponent, gene[0]))
+				print("Rank:", gene[4], "\tGene:", gene[0], "\tScore:", gene[1], "\tCOSMIC:", gene[2], "\tTCGA:", gene[3], "\tDegree:", NX.degree(bigComponent, gene[0]), "\tEigenvector:", round(eigenvectorCentralities[gene[0]], 8))
 			print("\nAnalysis Statistics:")
 			print("p-Value\t\t", "=", pValue)
 			print("n\t\t", "=", len(cbList))
-			print("------------------------------------------------------------------------------------------")
+			print("------------------------------------------------------------------------------------------------------------------------")
 			print("\nTop Ranked Genes (Sepset Belief)\n")
 			for gene in topSBCutoff:
-				print("Rank:", gene[4], "\tGene:", gene[0], "\tScore:", gene[1], "\tCOSMIC:", gene[2], "\tTCGA:", gene[3], "\tDegree:", NX.degree(bigComponent, gene[0]))
+				print("Rank:", gene[4], "\tGene:", gene[0], "\tScore:", gene[1], "\tCOSMIC:", gene[2], "\tTCGA:", gene[3], "\tDegree:", NX.degree(bigComponent, gene[0]), "\tEigenvector:", round(eigenvectorCentralities[gene[0]], 8))
 			print("\nAnalysis Statistics:")
 			print("p-Value\t\t", "=", pValue)
 			print("n\t\t", "=", len(sbList))
-			print("------------------------------------------------------------------------------------------")
+			print("------------------------------------------------------------------------------------------------------------------------")
 			print("\nTop 25 Novel Candidate Genes (Sepset Belief)\n")
 			count = 0
 			for gene in topCBAll:
 				if count < 25:
 					if gene[3] is False:
-						print("Rank:", gene[4], "\tGene:", gene[0], "\tScore:", gene[1], "\tCOSMIC:", gene[2], "\tTCGA:", gene[3], "\tDegree:", NX.degree(bigComponent, gene[0]))
+						print("Rank:", gene[4], "\tGene:", gene[0], "\tScore:", gene[1], "\tCOSMIC:", gene[2], "\tTCGA:", gene[3], "\tDegree:", NX.degree(bigComponent, gene[0]), "\tEigenvector:", round(eigenvectorCentralities[gene[0]], 8))
 						count += 1
-			print("------------------------------------------------------------------------------------------")
+			print("------------------------------------------------------------------------------------------------------------------------")
 			print("\nTop 25 Novel Candidate Genes (Sepset Belief)\n")
 			count = 0
 			for gene in topSBAll:
 				if count < 25:
 					if gene[3] is False:
-						print("Rank:", gene[4], "\tGene:", gene[0], "\tScore:", gene[1], "\tCOSMIC:", gene[2], "\tTCGA:", gene[3], "\tDegree:", NX.degree(bigComponent, gene[0]))
+						print("Rank:", gene[4], "\tGene:", gene[0], "\tScore:", gene[1], "\tCOSMIC:", gene[2], "\tTCGA:", gene[3], "\tDegree:", NX.degree(bigComponent, gene[0]), "\tEigenvector:", round(eigenvectorCentralities[gene[0]], 8))
 						count += 1
 
 			print("\nAnalysis Statistics:")
 			print("p-Value\t\t", "=", pValue)
 			print("n\t\t", "=", len(sbList))
-			print("------------------------------------------------------------------------------------------")
+			print("------------------------------------------------------------------------------------------------------------------------")
 			print("\nNetwork (Big Component) Statistics")
-			print("Nodes\t\t:", bigComponent.number_of_nodes())
-			print("Edges\t\t:", bigComponent.number_of_edges())
-			print("Mean Degree\t:", float(bigComponent.number_of_edges()) / bigComponent.number_of_nodes())
-			print("Data Source\t:", interactionDataPath)
-			print("------------------------------------------------------------------------------------------")
+			print("Nodes\t\t\t:", bigComponent.number_of_nodes())
+			print("Edges\t\t\t:", bigComponent.number_of_edges())
+			print("Mean Degree\t\t:", float(bigComponent.number_of_edges()) / bigComponent.number_of_nodes())
+			print("Mean Shortest Path\t:", bcMSP)
+			print("Network Diameter\t:", bcDiameter)
+			print("TCGA Nodes\t\t:", len(alltcgaGenes))
+			print("COSMIC Nodes\t\t:", len(allCosmicGenes))
+			print("Data Source\t\t:", interactionDataPath)
+			print("------------------------------------------------------------------------------------------------------------------------")
 
 	# 
 	# Big Component Analysis
