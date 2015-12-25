@@ -1,2 +1,7 @@
 objects/*
 reference/*
+*.zip
+*.rtf
+*.pickle
+*.png
+*.gml

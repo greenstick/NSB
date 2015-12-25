@@ -1,14 +1,9 @@
 #! /usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 Developed With Python Version 3.5
 
 """
-
-# Maybe The Max Eigenvalue Being Low is Caused by The FutureWarnings I'm Getting...but Probably Not.
-# import warnings
-# warnings.simplefilter(action = "ignore", category = FutureWarning)
 
 # Import Core Modules
 import csv 					as CSV
@@ -24,12 +19,11 @@ import random 				as Random
 # Import Third-Party Modules
 import numpy 				as Npy
 import numpy.linalg 		as LinearAlgebra
-import networkx 			as NX
 import pandas 				as Pandas
+import networkx 			as NX
 
 # Import Functions
 from collections 			import deque
-from networkx.algorithms 	import approximation
 from pgmpy.models 			import MarkovModel
 from pgmpy.factors 			import Factor
 from pgmpy.inference 		import VariableElimination
@@ -58,6 +52,15 @@ def writeOutput (data, path="output/output.txt", newline = True):
 				file.write(str(line))
 		file.close()
 	return path
+
+# Delete Files (remove symlinks) in Directory
+def unlinkDirectory (path):
+	"""
+	Unlink files in directory
+	@params
+		path  		– Required 	: path
+	"""
+	return list(map(OS.unlink, (OS.path.join( path, file) for file in OS.listdir(path))))
 
 # Read Delimited File Columns
 def readColsFromXSV(path, colStart = 0, colStop = 0, colStep = 1, keepHeader = True, delimiter = ",", openAs = "r", progress = False):
@@ -135,6 +138,7 @@ def printProgress (iteration, total, prefix = '', suffix = '', decimals = 2, bar
 	filledLength 	= int(round(barLength * iteration / float(total)))
 	percents 		= round(100.00 * (iteration / float(total)), decimals)
 	bar 			= '#' * filledLength + '-' * (barLength - filledLength)
+	Sys.stdout.write('\r'),
 	Sys.stdout.write('%s [%s] %s%s %s\r' % (prefix, bar, percents, '%', suffix)),
 	Sys.stdout.flush()
 
@@ -267,10 +271,11 @@ if __name__ == "__main__":
 		fiDataPath 					 	= "data/FIsInGene_121514_with_annotations.txt"
 		oncoNetDataPath 				= "data/Census_allTue Dec  8 23_01_10 2015.csv"
 		tcgaNetDataPath 				= "data/tcga-genes.txt"
-		outputDirectory  				= "output/"
+		gmlDirectory  					= "output/gml/"
 		rcsbDirectory 					= "objects/rc-analysis/sepsetbeliefs/"
 		rccbDirectory 					= "objects/rc-analysis/cliquebeliefs/"
 		rccDirectory 					= "objects/rc-analysis/cliques/"
+		rcrcDirectory 					= "objects/rc-analysis/components/"
 		bcsbDirectory 					= "objects/bc-analysis/sepsetbeliefs/"
 		bccbDirectory 					= "objects/bc-analysis/cliquebeliefs/"
 		bccDirectory 					= "objects/bc-analysis/cliques/"
@@ -281,6 +286,7 @@ if __name__ == "__main__":
 		randomComponentSize 			= 100
 		interactionDataResponse 		= "0"
 		pValue 							= float(getUserInput(valid=r"([0]\.[0-9]{1,3}|exit)", prompt="\tPrompt: Set rank p-Value...", hint = "\t\tHint: enter a number between 0.001 and 0.999\n\t\tSelection: ", failed = "\t\tError: Invalid input"))
+		rankCutoff 					 	= int(getUserInput(valid=r"([1-9][0-9]{1,2}|exit)", prompt="\tPrompt: Number of top ranked novel candidates to return?", hint = "\t\tHint: enter a number between 1 and 999. Top ranks of 25 or 50 are typical. \n\t\tSelection: ", failed = "\t\tError: Invalid input"))
 		usePicklesResponse 				= getUserInput(valid=r"([yYnN]{1}|exit)", prompt="\tPrompt: Reproduce last run using pickled data?", hint = "\t\tHint: enter 'y', 'n', or 'exit' to exit\n\t\tSelection: ", failed = "\t\tError: Invalid input")
 		if usePicklesResponse.lower() == "y":
 			usePickles 					= True
@@ -320,18 +326,20 @@ if __name__ == "__main__":
 	# 
 	# Import Data
 	# 
+
 		if usePickles == False:
 			print("\n\tStatus: Removing Data From Previous Run...")
 			if useRandomComponents == True:
-				list(map(OS.unlink, (OS.path.join( rcsbDirectory,f) for f in OS.listdir(rcsbDirectory))))
-				list(map(OS.unlink, (OS.path.join( rccbDirectory,f) for f in OS.listdir(rccbDirectory))))
-				list(map(OS.unlink, (OS.path.join( rccDirectory,f) for f in OS.listdir(rccDirectory))))
+				unlinkDirectory(rcsbDirectory)
+				unlinkDirectory(rccbDirectory)
+				unlinkDirectory(rccDirectory)
+				unlinkDirectory(rcrcDirectory)
 			else:
-				list(map(OS.unlink, (OS.path.join( bcsbDirectory,f) for f in OS.listdir(bcsbDirectory))))
-				list(map(OS.unlink, (OS.path.join( bccbDirectory,f) for f in OS.listdir(bccbDirectory))))
-				list(map(OS.unlink, (OS.path.join( bccDirectory,f) for f in OS.listdir(bccDirectory))))
-				list(map(OS.unlink, (OS.path.join( bcmDirectory,f) for f in OS.listdir(bcmDirectory))))
-		print("\tStatus: Importing Data\n")
+				unlinkDirectory(bcsbDirectory)
+				unlinkDirectory(bccbDirectory)
+				unlinkDirectory(bccDirectory)
+				unlinkDirectory(bcmDirectory)
+		print("\tStatus: Loading Data\n")
 		allInteractionPairs 			= []
 		if interactionDataResponse == "0":
 			# Import Interactions Node Data
@@ -360,21 +368,24 @@ if __name__ == "__main__":
 		tcgaDataFull					= set()
 		for gene in readColsFromXSV(tcgaNetDataPath, colStart = 0, colStop = 1, keepHeader = False, delimiter = ",", openAs = "U", progress = True):
 			tcgaDataFull.add(gene[0])
-		print("\tStatus: Generating TCGA subgraph")
+		allOncogenes = set(tcgaDataFull) | set(oncoDataFull)
+		# 619 oncogenes
 		# Generate Subgraph
-		interactionSubgraph 			= generateUnionSubgraph(allInteractionPairs, tcgaDataFull)[0]
-
-
+		# Critical error! 
+		# interactionSubgraph 			= generateUnionSubgraph(allInteractionPairs, allOncogenes)[0]
 
 	# 
 	# Structure Data & Perform Basic EDA
 	# 
 
-		print("\tStatus: Retrieving big component")
+		print("\tStatus: Generating FI subgraph & Saving to GML")
 		fullGraph 						= NX.Graph()
-		fullGraph.add_edges_from(interactionSubgraph)
+		# Updated to use allInteractionPairs rather than the Subgraph
+		fullGraph.add_edges_from(allInteractionPairs)
+		NX.write_gml(fullGraph, gmlDirectory + "fi_subgraph.gml")
+		print("\tStatus: Retrieving big component & Saving to GML")
 		bigComponent 					= max(NX.connected_component_subgraphs(fullGraph), key = len)
-		allInteractionPairs 			= []
+		NX.write_gml(bigComponent, gmlDirectory + "fi_subgraph_big_component.gml")
 		if useRandomComponents == True:
 			if bigComponent.number_of_nodes() <= randomComponentSize:
 				useRandomComponents 				= False
@@ -389,15 +400,19 @@ if __name__ == "__main__":
 			cliqueFiles 						= []
 			sepsetBeliefFiles 					= []
 			alltcgaGenes 						= set()
+			# Get all TCGA and COSMIC genes for downstream analysis
 			for gene in tcgaDataFull:
 				for edge in bigComponent.edges():
 					if gene in edge:
 						alltcgaGenes.add(gene)
-			allCosmicGenes 					= set()
+			allCosmicGenes 						= set()
 			for gene in oncoDataFull:
 				for edge in bigComponent.edges():
 					if gene in edge:
 						allCosmicGenes.add(gene)
+			# Get list of all oncogenes in big component for downstream analysis
+			allBCOncoGenes = alltcgaGenes | allCosmicGenes
+			# Get list of all oncogenes (COSMIC & TCGA) that appear in big component
 			if usePickles == True:
 				cliqueBeliefFiles 				= OS.listdir(OS.getcwd() + "/" + rccbDirectory)
 				cliqueFiles 					= OS.listdir(OS.getcwd() + "/" + rccDirectory)
@@ -413,25 +428,34 @@ if __name__ == "__main__":
 				tcgaGeneCounts 					= []
 				cosmicGeneCounts 				= []
 				i 								= 0
-				for c in range(randomComponentCount):
+				while i < randomComponentCount:
 					component 						= NX.Graph(generateRandomComponent(bigComponent.edges(), randomComponentSize))
-					nodeCounts.append(component.number_of_nodes())
-					edgeCounts.append(component.number_of_edges())
+					componentEdges 					= component.edges()
+					# Get Count of TCGA genes that appear in component (for RC metrics)
 					tcgaGenes 						= set()
 					for gene in tcgaDataFull:
-						for edge in component.edges():
+						for edge in componentEdges:
 							if gene in edge:
 								tcgaGenes.add(gene)
-					tcgaGeneCounts.append(len(tcgaGenes))
-					cosmicGenes 					= set()
-					for gene in oncoDataFull:
-						for edge in component.edges():
-							if gene in edge:
-								cosmicGenes.add(gene)
-					cosmicGeneCounts.append(len(cosmicGenes))
-					randomComponents.append(component)
-					i 							   += 1
-					printProgress(i, randomComponentCount, prefix = "\t\tRandom Components:" , suffix = "Generated", decimals = 2, barLength = 50)
+					# Verify that component has at least one TCGA gene in it
+					if len(tcgaGenes) > 0:
+						# Get Count of COSMIC genes that appear in component (for RC metrics)
+						cosmicGenes 					= set()
+						for gene in oncoDataFull:
+							for edge in componentEdges:
+								if gene in edge:
+									cosmicGenes.add(gene)
+						# Append component metrics to metric analysis sets
+						nodeCounts.append(component.number_of_nodes())
+						edgeCounts.append(component.number_of_edges())
+						tcgaGeneCounts.append(len(tcgaGenes))
+						cosmicGeneCounts.append(len(cosmicGenes))
+						# Append component to RC set for training
+						randomComponents.append(component)
+						i 							   += 1
+						printProgress(i, randomComponentCount, prefix = "\t\tRandom Components:" , suffix = "Generated", decimals = 2, barLength = 50)
+				with open(rcrcDirectory + str(randomComponentCount) + "_random_components.pickle", "wb") as jar:
+					Pickle.dump(randomComponents, jar)
 				print("\n\n\t\tRandom Component Metrics - >")
 				print("\n\t\t\tMin Node Count:\t\t\t", min(nodeCounts))
 				print("\t\t\tMedian Node Count:\t\t", median(nodeCounts))
@@ -449,33 +473,30 @@ if __name__ == "__main__":
 				print("\t\t\tMedian COSMIC Gene Count:\t", median(cosmicGeneCounts))
 				print("\t\t\tMax COSMIC Gene Count:\t\t", max(cosmicGeneCounts))
 				print("\t\t\tMean COSMIC Gene Count:\t\t", mean(cosmicGeneCounts))
-				
 				print("\n\tStatus: Generating Factors & Building Markov Networks")
 				allFactors 			= []
 				validModels 		= []
-				validModelsCount 	= 0
 				completedModels		= 0
 				i 					= 0
-				tcgaGeneStr = "_"	
+				tcgaGeneStr = "~"	
 				for gene in tcgaDataFull:
-					tcgaGeneStr 				= tcgaGeneStr + gene + "_"
-
+					tcgaGeneStr 				= tcgaGeneStr + gene + "~"
 				for component in randomComponents:
 					interactionFactors  			= []
 					for interaction in component.edges():
-						geneA, geneB = "_" + interaction[0] + "_", "_" + interaction[1] + "_"
+						geneA, geneB = "~" + interaction[0] + "~", "~" + interaction[1] + "~"
 						if geneA in tcgaGeneStr and geneB in tcgaGeneStr:
-							geneA, geneB 			= geneA.replace("_", ""), geneB.replace("_", "")
-							phi 	 				= Factor([geneA, geneB], [2, 2], [1, 1, 1, 100])
+							geneA, geneB 			= geneA.replace("~", ""), geneB.replace("~", "")
+							phi 	 				= Factor([geneA, geneB], [2, 2], [1, 20, 20, 100])
 						elif geneA in tcgaGeneStr:
-							geneA, geneB 			= geneA.replace("_", ""), geneB.replace("_", "")
-							phi 	 				= Factor([geneA, geneB], [2, 2], [1, 1, 100, 1])
+							geneA, geneB 			= geneA.replace("~", ""), geneB.replace("~", "")
+							phi 	 				= Factor([geneA, geneB], [2, 2], [1, 20, 60, 1])
 						elif geneB in tcgaGeneStr:
-							geneA, geneB 			= geneA.replace("_", ""), geneB.replace("_", "")
-							phi 	 				= Factor([geneA, geneB], [2, 2], [1, 100, 1, 1])
+							geneA, geneB 			= geneA.replace("~", ""), geneB.replace("~", "")
+							phi 	 				= Factor([geneA, geneB], [2, 2], [1, 60, 20, 1])
 						else:
-							geneA, geneB 			= geneA.replace("_", ""), geneB.replace("_", "")
-							phi 					= Factor([geneA, geneB], [2, 2], [100, 1, 1, 1])
+							geneA, geneB 			= geneA.replace("~", ""), geneB.replace("~", "")
+							phi 					= Factor([geneA, geneB], [2, 2], [40, 1, 1, 1])
 						interactionFactors.append(phi)
 					mrf 							= MarkovModel()
 					mrf.add_edges_from(component.edges())
@@ -483,8 +504,9 @@ if __name__ == "__main__":
 						mrf.add_factors(phi)
 					if mrf.check_model():
 						validModels.append(mrf)
-						validModelsCount 		   += 1
-				print("\tStatus: " + str(round(((float(validModelsCount) / randomComponentCount) * 100), 2)) + "%" + " of Models Pass Quality Check")
+				# Clear Random Components for Garbage Collection
+				randomComponents = None
+				print("\tStatus: " + str(round(((float(len(validModels)) / randomComponentCount) * 100), 2)) + "%" + " of Models Pass Quality Check")
 				print("\tStatus: Generating & Saving Inferences From Valid Models\n")
 				i = 0
 				for model in validModels:
@@ -494,14 +516,14 @@ if __name__ == "__main__":
 						cliqueBeliefs 				= inferenceModel.get_clique_beliefs()
 						cliques 					= inferenceModel.get_cliques()
 						sepsetBeliefs 				= inferenceModel.get_sepset_beliefs()
-						completedModels 		   += 1
-						i 						   += 1
-						with open(rcsbDirectory + str(completedModels) + "_supset_beliefs.pickle", "wb") as jar:
+						with open(rcsbDirectory + str(completedModels) + "_sepset_beliefs.pickle", "wb") as jar:
 							Pickle.dump(sepsetBeliefs, jar)			
 						with open(rccbDirectory + str(completedModels) + "_clique_beliefs.pickle", "wb") as jar:
 							Pickle.dump(cliqueBeliefs, jar)
 						with open(rccDirectory + str(completedModels) + "_cliques.pickle", "wb") as jar:
 							Pickle.dump(cliques, jar)
+						completedModels 		   += 1
+						i 						   += 1
 						printProgress(i, randomComponentCount, prefix = "\t\tComputing:" , suffix = "Success: (" + str(round(((float(completedModels) / i) * 100), 2)) + "%)" , decimals = 2, barLength = 50)
 					except:
 						i 						   += 1
@@ -510,12 +532,13 @@ if __name__ == "__main__":
 				cliqueBeliefFiles 						= OS.listdir(OS.getcwd() + "/" + rccbDirectory)
 				cliqueFiles 							= OS.listdir(OS.getcwd() + "/" + rccDirectory)
 				sepsetBeliefFiles 						= OS.listdir(OS.getcwd() + "/" + rcsbDirectory)
+				print("\n")
 
 		# 
 		# Computing highest scoring genes
 		# 
 			
-			print("\n\n\tStatus: Computing Gene Scores\n")
+			print("\tStatus: Computing Gene Scores\n")
 			cbDict = {}
 			sbDict = {}
 			i = 0
@@ -535,6 +558,10 @@ if __name__ == "__main__":
 				printProgress(i, len(cliqueBeliefFiles), prefix = "\t\tComputing Clique Belief Gene Scores:" , suffix = "of Analysis Complete", decimals = 2, barLength = 50)
 			i = 0
 			cbList = sorted(cbDict.items(), key = lambda x: x[1], reverse = True)
+			# Normalize Scores
+			cbListMin 	= cbList[-1][1]
+			cbListDenom = cbList[0][1] - cbListMin
+			cbList 		= [(value[0], round(((value[1] - cbListMin) / cbListDenom), 4)) for value in cbList]
 			print("\n")
 			for sepsetBeliefFile in sepsetBeliefFiles:
 				uniqueSBs = set()
@@ -550,9 +577,14 @@ if __name__ == "__main__":
 							else:
 								sbDict[g] = 1
 				i += 1
-				printProgress(i, len(sepsetBeliefFiles), prefix = "\t\tComputing Sepset Belief Gene Scores:" , suffix = "of Analysis Complete", decimals = 2, barLength = 50)
-			sbList = sorted(sbDict.items(), key = lambda x: x[1], reverse = True)
-			print("\n\n\tStatus: Generating Analysis")
+				printProgress(i, len(sepsetBeliefFiles), prefix = "\t\tComputing Separation Set Belief Gene Scores:" , suffix = "of Analysis Complete", decimals = 2, barLength = 50)
+			sbList 		= sorted(sbDict.items(), key = lambda x: x[1], reverse = True)
+			# Normalize Scores
+			sbListMin 	= sbList[-1][1]
+			sbListDenom = sbList[0][1] - sbListMin
+			sbList 		= [(value[0], round(((value[1] - sbListMin) / sbListDenom), 4)) for value in sbList]
+			networkAnalysis = getUserInput(valid=r"([yYnN]{1})", prompt="\n\n\tPrompt: Generate network analysis (in addition to inferences)?", hint = "\t\tHint: enter 'y' or 'n'\n\t\tSelection: ", failed = "\t\tError: Invalid input")
+			print("\n\tStatus: Generating Analysis\n")
 			# Cross Reference CB Genes With Known
 			topCBcosmic = []
 			# Are CB Genes in Cosmic?
@@ -605,57 +637,72 @@ if __name__ == "__main__":
 				topSBAll.append(gene)
 			topSBCutoff 				= topSBAll[0: int(pValue * len(sbList))]
 			eigenvectorCentralities 	= NX.eigenvector_centrality(bigComponent)
-			bcMSP 						= NX.average_shortest_path_length(bigComponent)
-			bcDiameter 					= NX.diameter(bigComponent)
 
-
-			print("\n------------------------------------------------------------------------------------------------------------------------")
-			print("--------------------------------------------------------ANALYSIS--------------------------------------------------------")
-			print("------------------------------------------------------------------------------------------------------------------------")
+			print("----------------------------------------------------------------------------------------------------------------------------")
+			print("--------------------------------------------------------- ANALYSIS ---------------------------------------------------------")
+			print("----------------------------------------------------------------------------------------------------------------------------")
 			print("\nTop Ranked Genes (Clique Belief)\n")
 			for gene in topCBCutoff:
 				print("Rank:", gene[4], "\tGene:", gene[0], "\tScore:", gene[1], "\tCOSMIC:", gene[2], "\tTCGA:", gene[3], "\tDegree:", NX.degree(bigComponent, gene[0]), "\tEigenvector:", round(eigenvectorCentralities[gene[0]], 8))
 			print("\nAnalysis Statistics:")
 			print("p-Value\t\t", "=", pValue)
 			print("n\t\t", "=", len(cbList))
-			print("------------------------------------------------------------------------------------------------------------------------")
+			print("----------------------------------------------------------------------------------------------------------------------------")
 			print("\nTop Ranked Genes (Sepset Belief)\n")
 			for gene in topSBCutoff:
 				print("Rank:", gene[4], "\tGene:", gene[0], "\tScore:", gene[1], "\tCOSMIC:", gene[2], "\tTCGA:", gene[3], "\tDegree:", NX.degree(bigComponent, gene[0]), "\tEigenvector:", round(eigenvectorCentralities[gene[0]], 8))
 			print("\nAnalysis Statistics:")
 			print("p-Value\t\t", "=", pValue)
 			print("n\t\t", "=", len(sbList))
-			print("------------------------------------------------------------------------------------------------------------------------")
-			print("\nTop 25 Novel Candidate Genes (Sepset Belief)\n")
+			print("----------------------------------------------------------------------------------------------------------------------------")
+			print("\nTop", rankCutoff, "Novel Candidate Genes (Clique Belief)\n")
+			topRankedCB = []
 			count = 0
 			for gene in topCBAll:
-				if count < 25:
+				if count < rankCutoff:
 					if gene[3] is False:
+						topRankedCB.append(gene)
 						print("Rank:", gene[4], "\tGene:", gene[0], "\tScore:", gene[1], "\tCOSMIC:", gene[2], "\tTCGA:", gene[3], "\tDegree:", NX.degree(bigComponent, gene[0]), "\tEigenvector:", round(eigenvectorCentralities[gene[0]], 8))
 						count += 1
-			print("------------------------------------------------------------------------------------------------------------------------")
-			print("\nTop 25 Novel Candidate Genes (Sepset Belief)\n")
+			print("----------------------------------------------------------------------------------------------------------------------------")
+			print("\nTop", rankCutoff, "Novel Candidate Genes (Separation Set Belief)\n")
+			topRankedSB = []
 			count = 0
 			for gene in topSBAll:
-				if count < 25:
+				if count < rankCutoff:
 					if gene[3] is False:
+						topRankedSB.append(gene)
 						print("Rank:", gene[4], "\tGene:", gene[0], "\tScore:", gene[1], "\tCOSMIC:", gene[2], "\tTCGA:", gene[3], "\tDegree:", NX.degree(bigComponent, gene[0]), "\tEigenvector:", round(eigenvectorCentralities[gene[0]], 8))
 						count += 1
-
-			print("\nAnalysis Statistics:")
-			print("p-Value\t\t", "=", pValue)
-			print("n\t\t", "=", len(sbList))
-			print("------------------------------------------------------------------------------------------------------------------------")
-			print("\nNetwork (Big Component) Statistics")
-			print("Nodes\t\t\t:", bigComponent.number_of_nodes())
-			print("Edges\t\t\t:", bigComponent.number_of_edges())
-			print("Mean Degree\t\t:", float(bigComponent.number_of_edges()) / bigComponent.number_of_nodes())
-			print("Mean Shortest Path\t:", bcMSP)
-			print("Network Diameter\t:", bcDiameter)
-			print("TCGA Nodes\t\t:", len(alltcgaGenes))
-			print("COSMIC Nodes\t\t:", len(allCosmicGenes))
-			print("Data Source\t\t:", interactionDataPath)
-			print("------------------------------------------------------------------------------------------------------------------------")
+			print("----------------------------------------------------------------------------------------------------------------------------")
+			print("\nNovel Classification Statistics")
+			cbNovelValid 	= (float(len([True for gene in topRankedCB if gene[2] is True])) / rankCutoff) * 100
+			cbNovel 		= (float(len([True for gene in topRankedCB if gene[2] is False])) / rankCutoff) * 100
+			sbNovelValid 	= (float(len([True for gene in topRankedSB if gene[2] is True])) / rankCutoff) * 100
+			sbNovel 		= (float(len([True for gene in topRankedSB if gene[2] is False])) / rankCutoff) * 100
+			print("\n\tValidated Accurate Novel Classifications")
+			print("\t\tClique Belief Classifier\t\t:", str(round(cbNovelValid, 4)) + "%")
+			print("\t\tSeparation Set Belief Classifier\t:", str(round(sbNovelValid, 4)) + "%")
+			print("\n\tNovel Classifications*")
+			print("\t\tClique Belief Classifier\t\t:", str(round(cbNovel, 4)) + "%")
+			print("\t\tSeparation Set Belief Classifier\t:", str(round(sbNovel, 4)) + "%")
+			print("\n\t*Novel classifications require gene lookup for validation")
+			print("----------------------------------------------------------------------------------------------------------------------------")
+			if networkAnalysis.lower() == "y":
+				print("Generating Network Analysis")
+				bcMSP 						= NX.average_shortest_path_length(bigComponent)
+				bcDiameter 					= NX.diameter(bigComponent)
+				print("\nNetwork (Big Component) Statistics")
+				print("Nodes\t\t\t:", bigComponent.number_of_nodes())
+				print("Edges\t\t\t:", bigComponent.number_of_edges())
+				print("Mean Degree\t\t:", round(float(bigComponent.number_of_edges()) / bigComponent.number_of_nodes(), 8))
+				print("Mean Shortest Path\t:", round(bcMSP, 8))
+				print("Network Diameter\t:", bcDiameter)
+				print("TCGA Nodes\t\t:", len(alltcgaGenes))
+				print("COSMIC Nodes\t\t:", len(allCosmicGenes))
+				print("All Oncogenes\t\t:", len(allBCOncoGenes))
+				print("Data Source\t\t:", interactionDataPath)
+				print("----------------------------------------------------------------------------------------------------------------------------")
 
 	# 
 	# Big Component Analysis
@@ -679,7 +726,9 @@ if __name__ == "__main__":
 			print("\t\t\tEdge Count:\t", targetComponent.number_of_edges())
 			print("\t\t\tTCGA Genes:\t", len(tcgaGenes))
 			print("\t\t\tCOSMIC Genes:\t", len(cosmicGenes))
+			print("\t\t\tAll Oncogenes: \t", len(allBCOncoGenes))
 			oncoDataFull 					= set()
+
 			# Convert TCGA Genes into String for O(n) Evaluation (in Python, still doing a string search under the hood)
 			tcgaGeneStr = "_"	
 			for gene in tcgaDataFull:
@@ -785,11 +834,28 @@ if __name__ == "__main__":
 			print("\tStatus: Saving cliques")
 			with open(bccDirectory + "bc_cliques.pickle", "wb") as jar:
 				Pickle.dump(cliques, jar)
-			print("\tStatus: Retrieving Supset Beliefs")
-			supsetBeliefs 						= oncogeneInferenceModel.get_sepset_beliefs()
-			print("\tStatus: Saving Supset Beliefs")
-			with open(bcsbDirectory + "bc_supset_beliefs.pickle", "wb") as jar:
-				Pickle.dump(supsetBeliefs, jar)
+			print("\tStatus: Retrieving Sepset Beliefs")
+			sepsetBeliefs 						= oncogeneInferenceModel.get_sepset_beliefs()
+			print("\tStatus: Saving Sepset Beliefs")
+			with open(bcsbDirectory + "bc_sepset_beliefs.pickle", "wb") as jar:
+				Pickle.dump(sepsetBeliefs, jar)
+
+
+		# Clear Generated Data
+		if useRandomComponents == True:
+			saveData = getUserInput(valid=r"([yYnN]{1})", prompt="\tPrompt: Save generated data (enables reproduction from pickled data)?", hint = "\t\tHint: enter 'y' or 'n'\n\t\tSelection: ", failed = "\t\tError: Invalid input")
+			if saveData.lower == "n":
+				unlinkDirectory(rcsbDirectory)
+				unlinkDirectory(rccbDirectory)
+				unlinkDirectory(rccDirectory)
+				unlinkDirectory(rcrcDirectory)
+		else:
+			saveData = getUserInput(valid=r"([yYnN]{1})", prompt="\tPrompt: Save generated data (enables reproduction from pickled data)?", hint = "\t\tHint: enter 'y' or 'n'\n\t\tSelection: ", failed = "\t\tError: Invalid input")
+			if saveData.lower == "n":
+				unlinkDirectory(bcsbDirectory)
+				unlinkDirectory(bccbDirectory)
+				unlinkDirectory(bccDirectory)
+				unlinkDirectory(bcmDirectory)
 		print("\nStatus: done\n")
 	except OSError as error:
 		print(error)
@@ -798,5 +864,4 @@ if __name__ == "__main__":
 	exitCode = 1
 	Sys.exit(exitCode)
 else:
-
 	pass
