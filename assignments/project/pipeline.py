@@ -15,6 +15,7 @@ import json 				as JSON
 import re 					as Rgx
 import pickle 				as Pickle
 import random 				as Random
+import multiprocessing 		as Multi
 
 # Import Third-Party Modules
 import numpy 				as Npy
@@ -30,6 +31,7 @@ from pgmpy.inference 		import VariableElimination
 from pgmpy.inference 		import BeliefPropagation
 from statistics 			import median
 from statistics 			import mean
+from multiprocessing 		import Pool
 
 # 
 # File Handling Utility Methods
@@ -285,8 +287,10 @@ if __name__ == "__main__":
 		randomComponentCount 			= 100
 		randomComponentSize 			= 100
 		interactionDataResponse 		= "0"
+		maxCores 						= Multi.cpu_count()
+		nCores 							= getUserInput(valid=r"([1-9][0-9]{0,1}|exit)", prompt="\tPrompt: Set number of cores to use for computations", hint = "\t\tHint: enter a number between 1 and %d\n\t\tSelection: " % (maxCores), failed = "\t\tError: Invalid input, %d cores are available on your system" % (maxCores))
 		pValue 							= float(getUserInput(valid=r"([0]\.[0-9]{1,3}|exit)", prompt="\tPrompt: Set rank p-Value...", hint = "\t\tHint: enter a number between 0.001 and 0.999\n\t\tSelection: ", failed = "\t\tError: Invalid input"))
-		rankCutoff 					 	= int(getUserInput(valid=r"([1-9][0-9]{1,2}|exit)", prompt="\tPrompt: Number of top ranked novel candidates to return?", hint = "\t\tHint: enter a number between 1 and 999. Top ranks of 25 or 50 are typical. \n\t\tSelection: ", failed = "\t\tError: Invalid input"))
+		rankCutoff 					 	= int(getUserInput(valid=r"([1-9][0-9]{1,2}|exit)", prompt="\tPrompt: Number of top ranked novel candidates to return?", hint = "\t\tHint: enter a number between 1 and 999. Top ranks of 25 or 50 are typical.\n\t\tSelection: ", failed = "\t\tError: Invalid input"))
 		usePicklesResponse 				= getUserInput(valid=r"([yYnN]{1}|exit)", prompt="\tPrompt: Reproduce last run using pickled data?", hint = "\t\tHint: enter 'y', 'n', or 'exit' to exit\n\t\tSelection: ", failed = "\t\tError: Invalid input")
 		if usePicklesResponse.lower() == "y":
 			usePickles 					= True
@@ -428,6 +432,7 @@ if __name__ == "__main__":
 				tcgaGeneCounts 					= []
 				cosmicGeneCounts 				= []
 				i 								= 0
+				# Parallelize Here
 				while i < randomComponentCount:
 					component 						= NX.Graph(generateRandomComponent(bigComponent.edges(), randomComponentSize))
 					componentEdges 					= component.edges()
