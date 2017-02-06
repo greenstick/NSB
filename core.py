@@ -20,6 +20,17 @@ import errno 		as Error
 # Utility Methods
 # 
 
+def rnd (value, precision = 0.1, rounding = "ROUND_HALF_UP"):
+    """
+    An accurate, predictable, no monkey business rounding function.
+    @params:
+        value     - Required - Numeric (String or Float)
+        precision - Optional - Numeric (String or Float)
+        rounding  - Optional - String  (see https://docs.python.org/3/library/decimal.html for acceptable values)
+    """
+    from decimal import Decimal
+    return Decimal(str(value)).quantize(Decimal(str(precision)), rounding = rounding)
+
 # Parse JSON Objects to Python Dictionaries
 def parseJSONToDicts (path):
 	"""
@@ -30,7 +41,7 @@ def parseJSONToDicts (path):
 	"""
 	with open(path, "r") as file:
 		dicts = JSON.load(file)
-		return dicts
+	return dicts
 
 # Make Directories From Path
 def makeDirectories (path):

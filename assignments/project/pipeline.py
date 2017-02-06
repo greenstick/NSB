@@ -58,10 +58,11 @@ def writeOutput (data, path="output/output.txt", newline = True):
 # Delete Files (remove symlinks) in Directory
 def unlinkDirectory (path):
 	"""
-	Unlink files in directory
+	Delete files in directory (remove symlinks)
 	@params
 		path  		– Required 	: path
 	"""
+	import os as OS
 	return list(map(OS.unlink, (OS.path.join( path, file) for file in OS.listdir(path))))
 
 # Read Delimited File Columns
@@ -106,7 +107,7 @@ def readColsFromXSV(path, colStart = 0, colStop = 0, colStep = 1, keepHeader = T
 	return rowValues
 
 # Prompt user input from command line
-def getUserInput (valid, prompt, hint = "", failed = "Error: Invalid input"):
+def getUserInput (valid, prompt, hint = "", failed = "Error: Invalid input", attempts = 3):
 	"""
 	Prompts user for and validates input using regular expression
 	@params:
@@ -124,8 +125,14 @@ def getUserInput (valid, prompt, hint = "", failed = "Error: Invalid input"):
 	if Rgx.match(valid, response):
 		return response
 	else:
-		print(failed)
-		return getUserInput(valid, prompt, hint, failed)
+		if attempts > 0:
+			print(failed)
+			attempts -= 1
+			return getUserInput(valid, prompt, hint = hint, failed = failed, attempts = attempts)
+		else:
+			print(failed)
+			print("Exiting")
+			exit()
 
 # Print iterations progress
 def printProgress (iteration, total, prefix = '', suffix = '', decimals = 2, barLength = 100):
@@ -288,6 +295,11 @@ if __name__ == "__main__":
 		randomComponentSize 			= 100
 		interactionDataResponse 		= "0"
 		maxCores 						= Multi.cpu_count()
+
+# 
+# Command Line Setup 
+# 
+
 		nCores 							= getUserInput(valid=r"([1-9][0-9]{0,1}|exit)", prompt="\tPrompt: Set number of cores to use for computations", hint = "\t\tHint: enter a number between 1 and %d\n\t\tSelection: " % (maxCores), failed = "\t\tError: Invalid input, %d cores are available on your system" % (maxCores))
 		pValue 							= float(getUserInput(valid=r"([0]\.[0-9]{1,3}|exit)", prompt="\tPrompt: Set rank p-Value...", hint = "\t\tHint: enter a number between 0.001 and 0.999\n\t\tSelection: ", failed = "\t\tError: Invalid input"))
 		rankCutoff 					 	= int(getUserInput(valid=r"([1-9][0-9]{1,2}|exit)", prompt="\tPrompt: Number of top ranked novel candidates to return?", hint = "\t\tHint: enter a number between 1 and 999. Top ranks of 25 or 50 are typical.\n\t\tSelection: ", failed = "\t\tError: Invalid input"))
